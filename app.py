@@ -27,7 +27,7 @@ def load_model():
 model = load_model()
 
 # === Обработка одиночного аудиофайла ===
-def process_audio(file, participant_id, session):
+def process_audio(file, participant_id, session, rater):
     # Чтение файла
     y, sr = sf.read(file)
     if y.ndim > 1:
