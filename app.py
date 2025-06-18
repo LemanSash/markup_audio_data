@@ -5,6 +5,7 @@ import soundfile as sf
 import numpy as np
 import pandas as pd
 import io
+import zipfile
 from features import extract_frame_features
 from utils import BiLSTMModel
 
@@ -74,7 +75,7 @@ def process_audio(file, participant_id, session):
         "pain": "",
         "RT_start": rs,
         "RT_end": re,
-        "rater": "",
+        "rater": rater,
         "audio_file": audio_number
     }])
 
@@ -86,27 +87,49 @@ uploaded_files = st.file_uploader("Выберите .wav файлы", type=["wav
 if uploaded_files:
     participant_id = st.text_input("ID участника (например, 03)", "")
     session = st.selectbox("Сессия", ["day1", "day2", "other"])
-
+    rater = st.text_input("👩‍🔬 Имя экспериментатора", "")
+    excel_buffers = []
     if participant_id and session:
         for file in uploaded_files:
             with st.spinner(f"Обработка {file.name}..."):
                 df = process_audio(file, participant_id, session)
 
+                # Временный буфер
+                output = io.BytesIO()
+                df.to_excel(output, index=False)
+                output.seek(0)
+                
+                excel_buffers.append((file.name.replace(".wav", ".xlsx"), output))
+
                 # Вывод таблицы
                 st.write(f"📄 Результат для {file.name}")
                 st.dataframe(df)
 
-                # Кнопка скачивания Excel
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False)
-                output.seek(0)
+                # # Кнопка скачивания Excel
+                # output = io.BytesIO()
+                # with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                #     df.to_excel(writer, index=False)
+                # output.seek(0)
 
-                st.download_button(
-                    label=f"⬇ Скачать Excel для {file.name}",
-                    data=output,
-                    file_name=f"{file.name.replace('.wav', '')}_rt.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                # st.download_button(
+                #     label=f"⬇ Скачать Excel для {file.name}",
+                #     data=output,
+                #     file_name=f"{file.name.replace('.wav', '')}_rt.xlsx",
+                #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                # )
+                # Создание архива
+                if excel_buffers:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                        for filename, buffer in excel_buffers:
+                            zipf.writestr(filename, buffer.read())
+                    zip_buffer.seek(0)
+
+                    st.download_button(
+                        label="Скачать все в ZIP",
+                        data=zip_buffer,
+                        file_name="all_annotations.zip",
+                        mime="application/zip"
+                    )
     else:
         st.warning("Пожалуйста, укажите ID участника и выберите сессию.")
