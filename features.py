@@ -1,10 +1,15 @@
 import numpy as np
 import librosa
-from python_speech_features import mfcc, delta
 
-def extract_frame_features(signal, sample_rate):
-    mfcc_feat = mfcc(signal, samplerate=sample_rate, numcep=13)
-    d_mfcc_feat = delta(mfcc_feat, 2)
-    dd_mfcc_feat = delta(d_mfcc_feat, 2)
-    combined = np.hstack((mfcc_feat, d_mfcc_feat, dd_mfcc_feat))  # shape: (frames, 39)
-    return combined
+
+FRAME_LENGTH = 2048
+HOP_LENGTH = 512
+N_MFCC = 13
+
+def extract_frame_features(y, sr):
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=N_MFCC,
+                                hop_length=HOP_LENGTH, n_fft=FRAME_LENGTH)
+    mfcc_delta = librosa.feature.delta(mfcc)
+    mfcc_delta2 = librosa.feature.delta(mfcc, order=2)
+    features = np.vstack([mfcc, mfcc_delta, mfcc_delta2]).T
+    return features
