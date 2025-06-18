@@ -89,47 +89,28 @@ if uploaded_files:
     session = st.selectbox("Сессия", ["day1", "day2", "other"])
     rater = st.text_input("👩‍🔬 Имя экспериментатора", "")
     excel_buffers = []
-    if participant_id and session:
+    if participant_id and session and uploaded_files and rater:
+        all_results = []
+
         for file in uploaded_files:
             with st.spinner(f"Обработка {file.name}..."):
-                df = process_audio(file, participant_id, session)
-
-                # Временный буфер
-                output = io.BytesIO()
-                df.to_excel(output, index=False)
-                output.seek(0)
-                
-                #excel_buffers.append((file.name.replace(".wav", ".xlsx"), output))
-                excel_buffers.append((f'p{participant_id}_results.xlsx', output))
-                # Вывод таблицы
-                st.write(f"📄 Результат для {file.name}")
+                df = process_audio(file, participant_id, session, rater)
+                all_results.append(df)
+                st.success(f"✅ {file.name} обработан")
                 st.dataframe(df)
 
-                # # Кнопка скачивания Excel
-                # output = io.BytesIO()
-                # with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                #     df.to_excel(writer, index=False)
-                # output.seek(0)
+        if all_results:
+            final_df = pd.concat(all_results, ignore_index=True)
 
-                # st.download_button(
-                #     label=f"⬇ Скачать Excel для {file.name}",
-                #     data=output,
-                #     file_name=f"{file.name.replace('.wav', '')}_rt.xlsx",
-                #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                # )
-                # Создание архива
-        if excel_buffers:
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "w") as zipf:
-                        for filename, buffer in excel_buffers:
-                            zipf.writestr(filename, buffer.read())
-                    zip_buffer.seek(0)
+            output = io.BytesIO()
+            final_df.to_excel(output, index=False)
+            output.seek(0)
 
-                    st.download_button(
-                        label="Скачать все в ZIP",
-                        data=zip_buffer,
-                        file_name="all_annotations.zip",
-                        mime="application/zip"
-                    )       
+            st.download_button(
+                label="📥 Скачать все результаты (Excel)",
+                data=output,
+                file_name=f"p{participant_id}_results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
     else:
         st.warning("Пожалуйста, укажите ID участника и выберите сессию.")
