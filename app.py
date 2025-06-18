@@ -3,7 +3,7 @@ import torch
 import soundfile as sf
 import numpy as np
 import pandas as pd
-from model import RTModel
+from utils import BiLSTMModel, extract_features
 from features import extract_frame_features
 
 HOP_LENGTH = 512
@@ -11,7 +11,7 @@ MODEL_PATH = 'speech_seg_model.pt'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Load model
-model = RTModel()
+model = BiLSTMModel()
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.to(device)
 model.eval()
