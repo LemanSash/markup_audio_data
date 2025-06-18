@@ -5,4 +5,4 @@ pandas
 soundfile
 openpyxl
 numpy
-torchaudio
+python_speech_features

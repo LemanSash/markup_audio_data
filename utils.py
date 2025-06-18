@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torchaudio
+import python_speech_features
 import os
 import numpy as np
 
@@ -19,14 +19,9 @@ class BiLSTMModel(nn.Module):
 
 # === Функция извлечения признаков (пример) ===
 def extract_features(audio, sr, frame_size=0.025, hop_size=0.01):
-    frame_len = int(sr * frame_size)
+    mfcc = python_speech_features.mfcc(audio, samplerate=sr, winlen=frame_size, winstep=hop_size, numcep=13)
+    delta = python_speech_features.delta(mfcc, 2)
+    delta2 = python_speech_features.delta(delta, 2)
+    feats = np.hstack([mfcc, delta, delta2])
     hop_len = int(sr * hop_size)
-    mfcc = torchaudio.transforms.MFCC(
-        sample_rate=sr,
-        n_mfcc=13,
-        melkwargs={"n_fft": 400, "hop_length": hop_len, "n_mels": 26}
-    )(torch.tensor(audio).float())
-    delta = torchaudio.functional.compute_deltas(mfcc)
-    delta2 = torchaudio.functional.compute_deltas(delta)
-    feat = torch.cat([mfcc, delta, delta2], dim=0).T
-    return feat.numpy(), hop_len
+    return feats, hop_len
