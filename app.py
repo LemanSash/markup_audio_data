@@ -118,7 +118,7 @@ if uploaded_files:
                 #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 # )
                 # Создание архива
-                if excel_buffers:
+        if excel_buffers:
                     zip_buffer = io.BytesIO()
                     with zipfile.ZipFile(zip_buffer, "w") as zipf:
                         for filename, buffer in excel_buffers:
@@ -130,6 +130,6 @@ if uploaded_files:
                         data=zip_buffer,
                         file_name="all_annotations.zip",
                         mime="application/zip"
-                    )
+                    )       
     else:
         st.warning("Пожалуйста, укажите ID участника и выберите сессию.")
