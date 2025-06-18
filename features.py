@@ -1,14 +1,26 @@
-import librosa
 import numpy as np
-
-FRAME_LENGTH = 2048
-HOP_LENGTH = 512
-N_MFCC = 13
+import librosa
+import python_speech_features
 
 def extract_frame_features(y, sr):
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=N_MFCC,
-                                hop_length=HOP_LENGTH, n_fft=FRAME_LENGTH)
-    mfcc_delta = librosa.feature.delta(mfcc)
-    mfcc_delta2 = librosa.feature.delta(mfcc, order=2)
-    features = np.vstack([mfcc, mfcc_delta, mfcc_delta2]).T
+    # MFCC
+    mfcc = python_speech_features.mfcc(y, samplerate=sr, winstep=512 / sr)
+    
+    # Energy
+    energy = np.array([
+        np.sum(np.square(y[i * 512: (i + 1) * 512]))
+        for i in range(mfcc.shape[0])
+    ]).reshape(-1, 1)
+    
+    # Pitch (using librosa's piptrack)
+    pitches, magnitudes = librosa.piptrack(y=y.astype(float), sr=sr, hop_length=512)
+    pitch = []
+    for i in range(pitches.shape[1]):
+        index = magnitudes[:, i].argmax()
+        pitch_val = pitches[index, i]
+        pitch.append(pitch_val)
+    pitch = np.array(pitch).reshape(-1, 1)
+    
+    # Объединение всех признаков
+    features = np.hstack([mfcc, energy, pitch])
     return features

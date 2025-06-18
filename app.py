@@ -1,40 +1,46 @@
 import streamlit as st
 import torch
+import os
 import soundfile as sf
 import numpy as np
 import pandas as pd
 import io
-from utils import BiLSTMModel, extract_features
 from features import extract_frame_features
+from utils import BiLSTMModel
 
+st.title("Авторазметка аудио")
+
+# === Настройки ===
 HOP_LENGTH = 512
-MODEL_PATH = 'speech_seg_model.pt'
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cpu")
+MODEL_PATH = "speech_seg_model.pt"
 
-# Load model
-model = BiLSTMModel()
-model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-model.to(device)
-model.eval()
+# === Загрузка модели ===
+@st.cache_resource
+def load_model():
+    model = BiLSTMModel()
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    model.eval()
+    return model.to(device)
 
-# Streamlit UI
-st.title("Автоматическая разметка аудио (RT)")
+model = load_model()
 
-uploaded_file = st.file_uploader("Загрузите WAV-файл", type=["wav"])
-
-if uploaded_file:
-    st.audio(uploaded_file, format='audio/wav')
-    y, sr = sf.read(uploaded_file)
+# === Обработка одиночного аудиофайла ===
+def process_audio(file, participant_id, session):
+    # Чтение файла
+    y, sr = sf.read(file)
     if y.ndim > 1:
         y = y[:, 0]
-    feats = extract_frame_features(y, sr)
 
+    feats = extract_frame_features(y, sr)
+    X_tensor = torch.tensor(feats, dtype=torch.float32).unsqueeze(0).to(device)
+    lengths = torch.tensor([X_tensor.shape[1]])
+    
     with torch.no_grad():
-        X_tensor = torch.tensor(feats, dtype=torch.float32).unsqueeze(0).to(device)
-        lengths = torch.tensor([X_tensor.shape[1]])
         output = model(X_tensor, lengths)
         pred = torch.argmax(output, dim=-1).cpu().numpy()[0]
 
+    # Выделяем сегменты речи
     segs = []
     start = None
     for i, m in enumerate(pred):
@@ -53,41 +59,54 @@ if uploaded_file:
         rs = int(ls * HOP_LENGTH / sr * 1000)
         re = int(le * HOP_LENGTH / sr * 1000)
 
-    st.write(f"**RT_start:** {rs} мс")
-    st.write(f"**RT_end:** {re} мс")
-
+    # Строим DataFrame с нужными колонками
+    audio_number = os.path.splitext(file.name)[0]
     df = pd.DataFrame([{
-        'participant_ID': '',
-        'StimSite': '',
-        'Stimulus': '',
-        'session': '',
-        'Response': '',
-        'Response_transcription': '',
-        'Error_type': '',
-        'Comment': '',
-        'filename': uploaded_file.name,
-        'pain': '',
-        'RT_start': rs,
-        'RT_end': re,
-        'rater': '',
-        'audio_file': ''.join(filter(str.isdigit, uploaded_file.name))
+        "participant_ID": participant_id,
+        "StimSite": "",
+        "Stimulus": "",
+        "session": session,
+        "Response": "",
+        "Response_transcription": "",
+        "Error_type": "",
+        "Comment": "",
+        "filename": file.name,
+        "pain": "",
+        "RT_start": rs,
+        "RT_end": re,
+        "rater": "",
+        "audio_file": audio_number
     }])
 
-    # Конвертируем DataFrame в Excel в памяти
-    def convert_df_to_excel(df):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name='Results', index=False)
-        output.seek(0)
-        return output
+    return df
 
-    # Получаем бинарные данные
-    excel_data = convert_df_to_excel(df)
+# === Интерфейс Streamlit ===
+uploaded_files = st.file_uploader("Выберите .wav файлы", type=["wav"], accept_multiple_files=True)
 
-    # Кнопка загрузки
-    st.download_button(
-        label="Скачать как Excel",
-        data=excel_data,
-        file_name="annotations.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+if uploaded_files:
+    participant_id = st.text_input("ID участника (например, 03)", "")
+    session = st.selectbox("Сессия", ["day1", "day2", "other"])
+
+    if participant_id and session:
+        for file in uploaded_files:
+            with st.spinner(f"Обработка {file.name}..."):
+                df = process_audio(file, participant_id, session)
+
+                # Вывод таблицы
+                st.write(f"📄 Результат для {file.name}")
+                st.dataframe(df)
+
+                # Кнопка скачивания Excel
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False)
+                output.seek(0)
+
+                st.download_button(
+                    label=f"⬇ Скачать Excel для {file.name}",
+                    data=output,
+                    file_name=f"{file.name.replace('.wav', '')}_rt.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    else:
+        st.warning("Пожалуйста, укажите ID участника и выберите сессию.")
