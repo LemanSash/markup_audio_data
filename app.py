@@ -76,7 +76,7 @@ if uploaded_file:
 
     @st.cache_data
     def convert_df(df):
-        return df.to_excel(index=False, engine='openpyxl')
+        return df.to_excel("output.xlsx", index=False)
 
     excel = convert_df(df)
     st.download_button("Скачать как Excel", excel, file_name="annotation.xlsx")
