@@ -99,8 +99,8 @@ if uploaded_files:
                 df.to_excel(output, index=False)
                 output.seek(0)
                 
-                excel_buffers.append((file.name.replace(".wav", ".xlsx"), output))
-
+                #excel_buffers.append((file.name.replace(".wav", ".xlsx"), output))
+                excel_buffers.append((f'p{participant_id}_results.xlsx', output))
                 # Вывод таблицы
                 st.write(f"📄 Результат для {file.name}")
                 st.dataframe(df)
