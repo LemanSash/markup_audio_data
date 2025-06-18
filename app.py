@@ -3,6 +3,7 @@ import torch
 import soundfile as sf
 import numpy as np
 import pandas as pd
+import io
 from utils import BiLSTMModel, extract_features
 from features import extract_frame_features
 
@@ -72,11 +73,21 @@ if uploaded_file:
         'audio_file': ''.join(filter(str.isdigit, uploaded_file.name))
     }])
 
-    st.dataframe(df)
+    # Конвертируем DataFrame в Excel в памяти
+    def convert_df_to_excel(df):
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Results', index=False)
+        output.seek(0)
+        return output
 
-    @st.cache_data
-    def convert_df(df):
-        return df.to_excel("output.xlsx", index=False)
+    # Получаем бинарные данные
+    excel_data = convert_df_to_excel(df)
 
-    excel = convert_df(df)
-    st.download_button("Скачать как Excel", excel, file_name="annotation.xlsx")
+    # Кнопка загрузки
+    st.download_button(
+        label="Скачать как Excel",
+        data=excel_data,
+        file_name="annotations.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
