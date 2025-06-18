@@ -1,0 +1,7 @@
+streamlit
+torch
+librosa
+pandas
+soundfile
+openpyxl
+numpy
